@@ -1,0 +1,12 @@
+{
+  "name": "talana-auto-attendance",
+  "version": "1.0.0",
+  "description": "Automatización de marcaje de asistencia en Talana",
+  "main": "mark-attendance.js",
+  "scripts": {
+    "start": "node mark-attendance.js"
+  },
+  "dependencies": {
+    "puppeteer": "^24.0.0"
+  }
+}
