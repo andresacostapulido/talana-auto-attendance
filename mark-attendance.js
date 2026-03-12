@@ -48,8 +48,8 @@ async function markAttendance() {
         await page.goto('https://talana.com/es/remuneraciones/login-vue', { waitUntil: 'networkidle2', timeout: 30000 });
         
         console.log('✍️ Llenando credenciales...');
-        const userSel = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.input-group--focused.input-group.input-group--error.input-group--required.input-group--text-field.error--text > div.input-group__input > input[type=text]';
-        const passSel = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.mt-2 > div.input-group--focused.input-group.input-group--append-icon.input-group--required.input-group--text-field.primary--text input[type=password]';
+        const userSel = '#login input[type=text]';
+        const passSel = '#login input[type=password]';
         const btnSel  = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.mt-2 > div.login-btn-container > t-button';
 
         await page.waitForSelector(userSel, { timeout: 10000 });
