@@ -48,20 +48,18 @@ async function markAttendance() {
         await page.goto('https://talana.com/es/remuneraciones/login-vue', { waitUntil: 'networkidle2', timeout: 30000 });
         
         console.log('✍️ Llenando credenciales...');
-        await page.waitForSelector('input[type="text"]', { timeout: 10000 });
-        await page.type('input[type="text"]', TALANA_USER, { delay: Math.random() * 100 + 50 });
+        const userSel = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.input-group--focused.input-group.input-group--error.input-group--required.input-group--text-field.error--text > div.input-group__input > input[type=text]';
+        const passSel = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.mt-2 > div.input-group--focused.input-group.input-group--append-icon.input-group--required.input-group--text-field.primary--text input[type=password]';
+        const btnSel  = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.mt-2 > div.login-btn-container > t-button';
+
+        await page.waitForSelector(userSel, { timeout: 10000 });
+        await page.type(userSel, TALANA_USER, { delay: Math.random() * 100 + 50 });
         await randomDelay(300, 800);
-        await page.type('input[type="password"]', TALANA_PASS, { delay: Math.random() * 100 + 50 });
+        await page.type(passSel, TALANA_PASS, { delay: Math.random() * 100 + 50 });
         await randomDelay(300, 600);
-        
+
         console.log('🖱️ Haciendo login...');
-        await page.evaluate(() => {
-            const form = document.querySelector('form');
-            if (form) { form.requestSubmit(); return; }
-            const btn = document.querySelector('button[type="submit"]');
-            if (btn) { btn.click(); return; }
-            document.querySelector('button.btn-type-talana-principal')?.click();
-        });
+        await page.click(btnSel);
         
         console.log('⏳ Esperando redirección a mi.talana.com...');
         await page.waitForFunction(
