@@ -16,7 +16,7 @@ const SEL = {
     
     salida: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(2) > div > div > div > div > div > div:nth-child(2) > a',
     
-    confirmar: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div.tln\\:flex.tln\\:justify-end.tln\\:gap-2.tln\\:p-4 > button.tln\\:relative.tln\\:flex.tln\\:items-center.tln\\:justify-center.tln\\:rounded-lg.tln\\:border.tln\\:border-solid.tln\\:font-medium.tln\\:focus-visible\\:ring-3.tln\\:focus-visible\\:outline-none.tln\\:border-transparent.tln\\:bg-gray-900.tln\\:text-white-900.tln\\:hover\\:bg-gray-700.tln\\:focus-visible\\:ring-purple-500.tln\\:active\\:bg-gray-500.tln\\:disabled\\:bg-black-50.tln\\:disabled\\:text-black-500.tln\\:px-\\[11px\\].tln\\:py-\\[9px\\].tln\\:text-body-md > div',
+    confirmar: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000 > div > div.tln\\:flex.tln\\:justify-end.tln\\:gap-2.tln\\:p-4 > button.tln\\:bg-gray-900 > div',
 };
 
 async function markAttendance() {
@@ -89,7 +89,7 @@ async function markAttendance() {
         console.log('✅ Confirmando...');
         await page.waitForSelector(SEL.confirmar, { timeout: 5000 });
         
-        const isDisabled = await page.$eval(SEL.confirmar, el => el.closest('button').disabled);
+        const isDisabled = await page.$eval(SEL.confirmar, el => el.disabled);
         if (isDisabled) throw new Error('Botón de confirmar está deshabilitado');
         
         await randomDelay(500, 1000);
