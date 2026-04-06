@@ -2,8 +2,13 @@ name: Marcar Asistencia Talana
 
 on:
   repository_dispatch:
-    types: [mark-attendance]
+    types: [mark-entrada, mark-salida]
   workflow_dispatch:
+    inputs:
+      tipo:
+        description: 'entrada o salida'
+        required: true
+        default: 'entrada'
 
 jobs:
   mark-attendance:
@@ -41,6 +46,7 @@ jobs:
         env:
           TALANA_USER: ${{ secrets.TALANA_USER }}
           TALANA_PASS: ${{ secrets.TALANA_PASS }}
+          TIPO: ${{ github.event.action == 'mark-entrada' && 'entrada' || github.event.action == 'mark-salida' && 'salida' || github.event.inputs.tipo }}
       
       - name: Notificar fallo
         if: steps.mark.outputs.success == 'false'

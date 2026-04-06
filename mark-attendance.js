@@ -20,14 +20,7 @@ const SEL = {
 };
 
 async function markAttendance() {
-    const now = new Date();
-    const hour = now.getUTCHours();
-    const minute = now.getUTCMinutes();
-    
-    let tipo = 'salida';
-    if ((hour === 11 && minute >= 45) || (hour === 12 && minute <= 30)) {
-        tipo = 'entrada';
-    }
+    const tipo = process.env.TIPO || 'entrada';
     
     const initialDelay = Math.floor(Math.random() * 180000);
     console.log(`⏳ Esperando ${Math.floor(initialDelay/1000)}s antes de iniciar...`);
