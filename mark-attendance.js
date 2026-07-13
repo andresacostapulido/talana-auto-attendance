@@ -22,7 +22,7 @@ const SEL = {
 async function markAttendance() {
     const tipo = process.env.TIPO || 'entrada';
     
-    const initialDelay = Math.floor(Math.random() * 180000);
+    const initialDelay = Math.floor(Math.random() * 15000);
     console.log(`⏳ Esperando ${Math.floor(initialDelay/1000)}s antes de iniciar...`);
     await sleep(initialDelay);
     
@@ -30,39 +30,119 @@ async function markAttendance() {
     
     const browser = await puppeteer.launch({
         headless: 'new',
-        args: ['--no-sandbox', '--disable-setuid-sandbox']
+        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage']
     });
     
+    let page;
     try {
-        const page = await browser.newPage();
+        page = await browser.newPage();
         await page.setDefaultNavigationTimeout(30000);
+        await page.setViewport({ width: 1280, height: 800 });
         
+        // === LOGIN ===
         console.log('🔐 Navegando a login...');
         await page.goto('https://talana.com/es/remuneraciones/login-vue', { waitUntil: 'networkidle2', timeout: 30000 });
         
-        console.log('✍️ Llenando credenciales...');
-        const userSel = '#login input[type=text]';
-        const passSel = '#login input[type=password]';
-        const btnSel  = '#login > div.application--wrap > main > div > div > div.flex.login-container.xs12.md6.lg6 > div > div > div:nth-child(2) > div.card-body > form > div.mt-2 > div.login-btn-container > t-button';
-
-        await page.waitForSelector(userSel, { timeout: 10000 });
-        await page.type(userSel, TALANA_USER, { delay: Math.random() * 100 + 50 });
-        await randomDelay(300, 800);
-        await page.type(passSel, TALANA_PASS, { delay: Math.random() * 100 + 50 });
-        await randomDelay(300, 600);
-
-        console.log('🖱️ Haciendo login...');
-        await page.click(btnSel);
+        // Screenshot post-carga de login
+        await page.screenshot({ path: 'step-01-login-page.png', fullPage: true });
+        console.log('📸 step-01: Página de login cargada');
+        console.log('📍 URL:', page.url());
         
-        console.log('⏳ Esperando redirección a mi.talana.com...');
-        await page.waitForFunction(
-            () => window.location.href.includes('mi.talana.com'),
-            { timeout: 15000 }
-        );
+        console.log('✍️ Llenando credenciales...');
+        // Intentar múltiples selectores para el campo de usuario
+        const userSelectors = [
+            '#login input[type=text]',
+            'input[name="username"]',
+            'input[placeholder*="mail"]',
+            'input[type="email"]',
+            '#login input:first-of-type'
+        ];
+        
+        let userInput = null;
+        for (const sel of userSelectors) {
+            userInput = await page.$(sel);
+            if (userInput) {
+                console.log(`  📌 Usuario encontrado con: ${sel}`);
+                break;
+            }
+        }
+        if (!userInput) {
+            await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
+            throw new Error('No se encontró el campo de usuario en ningún selector');
+        }
+        
+        await userInput.click();
+        await userInput.type(TALANA_USER, { delay: Math.random() * 80 + 30 });
+        await randomDelay(300, 600);
+        
+        // Campo de password
+        const passSelectors = [
+            '#login input[type=password]',
+            'input[type="password"]',
+            'input[name="password"]'
+        ];
+        
+        let passInput = null;
+        for (const sel of passSelectors) {
+            passInput = await page.$(sel);
+            if (passInput) {
+                console.log(`  📌 Password encontrado con: ${sel}`);
+                break;
+            }
+        }
+        if (!passInput) {
+            await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
+            throw new Error('No se encontró el campo de password');
+        }
+        
+        await passInput.click();
+        await passInput.type(TALANA_PASS, { delay: Math.random() * 80 + 30 });
+        await randomDelay(300, 600);
+        
+        await page.screenshot({ path: 'step-02-credentials-filled.png', fullPage: true });
+        console.log('📸 step-02: Credenciales llenadas');
+        
+        // Botón de login - usar Enter después de llenar credenciales (más robusto que buscar el botón)
+        console.log('🖱️ Haciendo login...');
+        // Primero intentar click en t-button
+        const tBtn = await page.$('div.login-btn-container t-button');
+        if (tBtn) {
+            console.log('  📌 Encontrado t-button, haciendo click...');
+            await tBtn.click();
+        } else {
+            // Fallback: Enter en el campo de password
+            console.log('  ⚠️ t-button no encontrado, presionando Enter...');
+            await page.keyboard.press('Enter');
+        }
+        
+        await sleep(2000);
+        
+        // Esperar redirección - con más tiempo y mejor diagnóstico
+        console.log('⏳ Esperando redirección...');
+        try {
+            await page.waitForFunction(
+                () => window.location.href.includes('mi.talana.com') || 
+                      window.location.href.includes('/home') ||
+                      window.location.href.includes('/dashboard'),
+                { timeout: 20000 }
+            );
+        } catch (navErr) {
+            // Si no redirigió, capturar estado actual
+            await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
+            const currentUrl = page.url();
+            const pageContent = await page.evaluate(() => document.body?.innerText?.substring(0, 500));
+            console.error(`📍 URL actual: ${currentUrl}`);
+            console.error(`📄 Contenido visible: ${pageContent}`);
+            throw new Error(`Login no redirigió. URL: ${currentUrl}`);
+        }
         
         await randomDelay(1500, 3000);
         console.log('✅ Login exitoso');
+        await page.screenshot({ path: 'step-03-logged-in.png', fullPage: true });
+        console.log('📸 step-03: Sesión iniciada');
+        console.log('📍 URL:', page.url());
         
+        // === MARCAR ASISTENCIA ===
         console.log('📍 Esperando botón "Marcar asistencia"...');
         await page.waitForSelector(SEL.markBtn, { timeout: 10000 });
         await page.click(SEL.markBtn);
@@ -93,6 +173,13 @@ async function markAttendance() {
         
     } catch (error) {
         console.error('❌ Error:', error.message);
+        if (page) {
+            try {
+                await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
+                console.log('📸 Screenshot de error guardado');
+                console.log('📍 URL al momento del error:', page.url());
+            } catch (e) { /* ignore */ }
+        }
         throw error;
     } finally {
         await browser.close();

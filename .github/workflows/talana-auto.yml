@@ -16,12 +16,12 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Checkout código
-        uses: actions/checkout@v3
+        uses: actions/checkout@v4
       
       - name: Setup Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '22'
       
       - name: Instalar dependencias
         run: npm install puppeteer
@@ -48,6 +48,16 @@ jobs:
           TALANA_PASS: ${{ secrets.TALANA_PASS }}
           TIPO: ${{ github.event.action == 'mark-entrada' && 'entrada' || github.event.action == 'mark-salida' && 'salida' || github.event.inputs.tipo }}
       
+      - name: Subir screenshots de diagnóstico
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-screenshots
+          path: |
+            step-*.png
+            error-screenshot.png
+          if-no-files-found: ignore
+
       - name: Notificar fallo
         if: steps.mark.outputs.success == 'false'
         run: |
