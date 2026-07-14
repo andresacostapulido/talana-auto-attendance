@@ -22,8 +22,9 @@ const SEL = {
 async function markAttendance() {
     const tipo = process.env.TIPO || 'entrada';
     
-    const initialDelay = Math.floor(Math.random() * 15000);
-    console.log(`⏳ Esperando ${Math.floor(initialDelay/1000)}s antes de iniciar...`);
+    // Delay aleatorio entre 1 y 5 minutos para que el horario de marcaje varíe
+    const initialDelay = Math.floor(Math.random() * 240000) + 60000;
+    console.log(`⏳ Esperando ${Math.floor(initialDelay/1000)}s (${Math.floor(initialDelay/60000)} min) antes de iniciar...`);
     await sleep(initialDelay);
     
     console.log(`🤖 Iniciando marcaje de ${tipo.toUpperCase()}...`);
@@ -102,20 +103,46 @@ async function markAttendance() {
         await page.screenshot({ path: 'step-02-credentials-filled.png', fullPage: true });
         console.log('📸 step-02: Credenciales llenadas');
         
-        // Botón de login - usar Enter después de llenar credenciales (más robusto que buscar el botón)
+        // Botón de login - múltiples estrategias
         console.log('🖱️ Haciendo login...');
-        // Primero intentar click en t-button
-        const tBtn = await page.$('div.login-btn-container t-button');
-        if (tBtn) {
-            console.log('  📌 Encontrado t-button, haciendo click...');
-            await tBtn.click();
+        
+        // Estrategia 1: buscar el elemento que contiene "Iniciar sesión" y hacer click nativo
+        const clicked = await page.evaluate(() => {
+            // Buscar en TODOS los elementos del DOM
+            const all = document.querySelectorAll('*');
+            for (const el of all) {
+                if (el.children.length === 0 && el.textContent.trim() === 'Iniciar sesión') {
+                    // Encontrar el elemento clickeable más cercano (padre)
+                    let target = el;
+                    while (target && target.tagName !== 'BODY') {
+                        if (target.tagName === 'BUTTON' || target.tagName === 'T-BUTTON' || 
+                            target.tagName === 'A' || target.getAttribute('role') === 'button' ||
+                            target.onclick || target.style.cursor === 'pointer') {
+                            target.click();
+                            return 'clicked-parent: ' + target.tagName;
+                        }
+                        target = target.parentElement;
+                    }
+                    // Si no encontró padre clickeable, click en el elemento mismo
+                    el.click();
+                    return 'clicked-self: ' + el.tagName;
+                }
+            }
+            return null;
+        });
+        
+        if (clicked) {
+            console.log(`  📌 ${clicked}`);
         } else {
-            // Fallback: Enter en el campo de password
-            console.log('  ⚠️ t-button no encontrado, presionando Enter...');
+            // Estrategia 2: Enter
+            console.log('  ⚠️ No encontró texto "Iniciar sesión", probando Enter...');
             await page.keyboard.press('Enter');
         }
         
-        await sleep(2000);
+        await sleep(3000);
+        await page.screenshot({ path: 'step-02b-after-login-click.png', fullPage: true });
+        console.log('📸 step-02b: Después del click/enter');
+        console.log('📍 URL:', page.url());
         
         // Esperar redirección - con más tiempo y mejor diagnóstico
         console.log('⏳ Esperando redirección...');
