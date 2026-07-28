@@ -40,121 +40,104 @@ async function markAttendance() {
         await page.setDefaultNavigationTimeout(30000);
         await page.setViewport({ width: 1280, height: 800 });
         
-        // === LOGIN ===
+        // === LOGIN (nuevo flujo 2 pasos: RUT → Continuar → Password → Login) ===
         console.log('🔐 Navegando a login...');
-        await page.goto('https://talana.com/es/remuneraciones/login-vue', { waitUntil: 'networkidle2', timeout: 30000 });
+        await page.goto('https://talana.com/app/#/auth/login', { waitUntil: 'networkidle2', timeout: 30000 });
         
-        // Screenshot post-carga de login
         await page.screenshot({ path: 'step-01-login-page.png', fullPage: true });
         console.log('📸 step-01: Página de login cargada');
         console.log('📍 URL:', page.url());
         
-        console.log('✍️ Llenando credenciales...');
-        // Intentar múltiples selectores para el campo de usuario
-        const userSelectors = [
-            '#login input[type=text]',
-            'input[name="username"]',
-            'input[placeholder*="mail"]',
-            'input[type="email"]',
-            '#login input:first-of-type'
-        ];
-        
-        let userInput = null;
-        for (const sel of userSelectors) {
-            userInput = await page.$(sel);
-            if (userInput) {
-                console.log(`  📌 Usuario encontrado con: ${sel}`);
-                break;
-            }
-        }
-        if (!userInput) {
+        // === PASO 1: Ingresar RUT ===
+        console.log('✍️ Paso 1: Ingresando RUT...');
+        await page.waitForSelector('#remote-app-login input', { timeout: 15000 });
+        const rutInput = await page.$('#remote-app-login input');
+        if (!rutInput) {
             await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
-            throw new Error('No se encontró el campo de usuario en ningún selector');
+            throw new Error('No se encontró el campo de RUT');
         }
         
-        await userInput.click();
-        await userInput.type(TALANA_USER, { delay: Math.random() * 80 + 30 });
+        await rutInput.click();
+        await rutInput.type(TALANA_USER, { delay: Math.random() * 80 + 30 });
         await randomDelay(300, 600);
         
-        // Campo de password
-        const passSelectors = [
-            '#login input[type=password]',
-            'input[type="password"]',
-            'input[name="password"]'
-        ];
+        await page.screenshot({ path: 'step-02-rut-filled.png', fullPage: true });
+        console.log('📸 step-02: RUT ingresado');
         
-        let passInput = null;
-        for (const sel of passSelectors) {
-            passInput = await page.$(sel);
-            if (passInput) {
-                console.log(`  📌 Password encontrado con: ${sel}`);
-                break;
-            }
+        // Click en botón "Continuar"
+        console.log('🖱️ Haciendo click en Continuar...');
+        const continuarClicked = await page.evaluate(() => {
+            const btns = [...document.querySelectorAll('button')];
+            const btn = btns.find(el => el.textContent.trim().includes('Continuar'));
+            if (btn) { btn.click(); return true; }
+            return false;
+        });
+        if (!continuarClicked) {
+            console.log('  ⚠️ Botón Continuar no encontrado, presionando Enter...');
+            await page.keyboard.press('Enter');
+        } else {
+            console.log('  📌 Botón Continuar clickeado');
+        }
+        
+        // === PASO 2: Esperar campo de contraseña (~10s) ===
+        console.log('⏳ Esperando campo de contraseña...');
+        await sleep(10000);
+        
+        await page.screenshot({ path: 'step-03-waiting-password.png', fullPage: true });
+        console.log('📸 step-03: Esperando campo contraseña');
+        
+        let passInput = await page.$('#remote-app-login input[type="password"]');
+        if (!passInput) {
+            // Fallback: cualquier input que no sea el de RUT
+            const allInputs = await page.$$('#remote-app-login input');
+            if (allInputs.length > 1) passInput = allInputs[allInputs.length - 1];
         }
         if (!passInput) {
             await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
-            throw new Error('No se encontró el campo de password');
+            throw new Error('No se encontró el campo de contraseña');
         }
         
+        console.log('✍️ Paso 2: Ingresando contraseña...');
         await passInput.click();
         await passInput.type(TALANA_PASS, { delay: Math.random() * 80 + 30 });
         await randomDelay(300, 600);
         
-        await page.screenshot({ path: 'step-02-credentials-filled.png', fullPage: true });
-        console.log('📸 step-02: Credenciales llenadas');
+        await page.screenshot({ path: 'step-04-password-filled.png', fullPage: true });
+        console.log('📸 step-04: Contraseña ingresada');
         
-        // Botón de login - múltiples estrategias
+        // Click en botón de login final
         console.log('🖱️ Haciendo login...');
-        
-        // Estrategia 1: buscar el elemento que contiene "Iniciar sesión" y hacer click nativo
-        const clicked = await page.evaluate(() => {
-            // Buscar en TODOS los elementos del DOM
-            const all = document.querySelectorAll('*');
-            for (const el of all) {
-                if (el.children.length === 0 && el.textContent.trim() === 'Iniciar sesión') {
-                    // Encontrar el elemento clickeable más cercano (padre)
-                    let target = el;
-                    while (target && target.tagName !== 'BODY') {
-                        if (target.tagName === 'BUTTON' || target.tagName === 'T-BUTTON' || 
-                            target.tagName === 'A' || target.getAttribute('role') === 'button' ||
-                            target.onclick || target.style.cursor === 'pointer') {
-                            target.click();
-                            return 'clicked-parent: ' + target.tagName;
-                        }
-                        target = target.parentElement;
-                    }
-                    // Si no encontró padre clickeable, click en el elemento mismo
-                    el.click();
-                    return 'clicked-self: ' + el.tagName;
-                }
-            }
-            return null;
+        const loginClicked = await page.evaluate(() => {
+            const btns = [...document.querySelectorAll('button')];
+            const btn = btns.find(el => {
+                const txt = el.textContent.trim();
+                return txt.includes('Iniciar') || txt.includes('Ingresar') || txt.includes('Entrar');
+            }) || btns.find(el => el.type === 'submit');
+            if (btn) { btn.click(); return btn.textContent.trim(); }
+            return false;
         });
-        
-        if (clicked) {
-            console.log(`  📌 ${clicked}`);
-        } else {
-            // Estrategia 2: Enter
-            console.log('  ⚠️ No encontró texto "Iniciar sesión", probando Enter...');
+        if (!loginClicked) {
+            console.log('  ⚠️ Botón login no encontrado, presionando Enter...');
             await page.keyboard.press('Enter');
+        } else {
+            console.log(`  📌 Botón "${loginClicked}" clickeado`);
         }
         
         await sleep(3000);
-        await page.screenshot({ path: 'step-02b-after-login-click.png', fullPage: true });
-        console.log('📸 step-02b: Después del click/enter');
+        await page.screenshot({ path: 'step-04b-after-login.png', fullPage: true });
+        console.log('📸 step-04b: Después del login');
         console.log('📍 URL:', page.url());
         
-        // Esperar redirección - con más tiempo y mejor diagnóstico
+        // Esperar redirección
         console.log('⏳ Esperando redirección...');
         try {
             await page.waitForFunction(
                 () => window.location.href.includes('mi.talana.com') || 
                       window.location.href.includes('/home') ||
-                      window.location.href.includes('/dashboard'),
+                      (window.location.href.includes('/app/') && !window.location.href.includes('/auth/')),
                 { timeout: 20000 }
             );
         } catch (navErr) {
-            // Si no redirigió, capturar estado actual
             await page.screenshot({ path: 'error-screenshot.png', fullPage: true });
             const currentUrl = page.url();
             const pageContent = await page.evaluate(() => document.body?.innerText?.substring(0, 500));
