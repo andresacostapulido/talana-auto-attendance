@@ -5,18 +5,56 @@ const TALANA_PASS = process.env.TALANA_PASS;
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 const randomDelay = (min, max) => sleep(Math.floor(Math.random() * (max - min + 1)) + min);
+const ATTENDANCE_MODAL = 'body > div[class*="tln:fixed"][class*="tln:z-10000000"]';
+const ATTENDANCE_TYPE_DROPDOWN = 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(1) > div > div.tln\\:me-3.tln\\:flex.tln\\:items-center.tln\\:gap-2';
+const CONFIRM_MARK_BUTTON = 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div > div.tln\\:flex.tln\\:justify-end.tln\\:gap-2.tln\\:p-4 > div:nth-child(2) > button';
+const ATTENDANCE_TYPE_OPTIONS = {
+    entrada: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(2) > div > div > div > div > div > div > div:nth-child(1) > a',
+    salida: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(2) > div > div > div > div > div > div > div:nth-child(2) > a'
+};
 
-// Selectores actualizados
-const SEL = {
-    markBtn: '#q-app > div > div.q-page-container > main > main > div.tln\\:flex.tln\\:flex-wrap.tln\\:gap-4.tln\\:lg\\:flex-nowrap > div.tln\\:w-full.tln\\:order-first.tln\\:md\\:order-0.tln\\:md\\:w-4\\/12 > div > div:nth-child(1) > div:nth-child(3) > button',
-    
-    dropdown: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(1) > div > div.tln\\:me-3.tln\\:flex.tln\\:items-center.tln\\:gap-2',
-    
-    entrada: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(2) > div > div > div > div > div > div:nth-child(1) > a',
-    
-    salida: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000.tln\\:flex.tln\\:p-4.tln\\:items-start.tln\\:justify-center.tln\\:pointer-events-auto.tln\\:bg-black-400 > div > div.tln\\:max-h-\\[calc\\(100vh-14rem\\)\\].tln\\:overflow-y-auto.tln\\:p-4 > div > div > div > div > div:nth-child(2) > div > div > div > div > div > div:nth-child(2) > a',
-    
-    confirmar: 'body > div.tln\\:fixed.tln\\:inset-0.tln\\:z-10000000 > div > div.tln\\:flex.tln\\:justify-end.tln\\:gap-2.tln\\:p-4 > button.tln\\:bg-gray-900 > div',
+const waitForVisibleText = (page, text, useLastMatch = false, requireEnabled = false, timeout = 5000, scopeSelector = null) =>
+    page.waitForFunction(
+        (expectedText, useLast, enabled, scope) => {
+            const normalize = value => String(value || '').replace(/\s+/g, ' ').trim().toLowerCase();
+            const normalizedText = normalize(expectedText);
+            const root = scope ? document.querySelector(scope) : document;
+            if (!root) return false;
+            const matches = [...root.querySelectorAll('button, a, input, select, [role="button"], [role="option"], [role="combobox"], div, span')]
+                .filter(element => {
+                    const style = window.getComputedStyle(element);
+                    const bounds = element.getBoundingClientRect();
+                    const labels = [
+                        element.innerText,
+                        element.textContent,
+                        element.value,
+                        element.getAttribute('aria-label'),
+                        element.getAttribute('title')
+                    ].map(normalize);
+                    return labels.includes(normalizedText) &&
+                        style.visibility !== 'hidden' && style.display !== 'none' &&
+                        bounds.width > 0 && bounds.height > 0;
+                });
+            const orderedMatches = matches.sort((first, second) =>
+                normalize(first.textContent).length - normalize(second.textContent).length
+            );
+            const element = useLast ? orderedMatches.at(-1) : orderedMatches[0];
+            return element && (!enabled || !element.disabled) ? element : false;
+        },
+        { timeout },
+        text,
+        useLastMatch,
+        requireEnabled,
+        scopeSelector
+    );
+
+const clickInteractiveElement = async (elementHandle) => {
+    const interactiveHandle = await elementHandle.evaluateHandle(element =>
+        element.closest('button, a, [role="button"], [role="option"], [role="combobox"], select, input') || element
+    );
+    const interactiveElement = interactiveHandle.asElement();
+    if (!interactiveElement) throw new Error('No se encontró un control interactivo para hacer clic');
+    await interactiveElement.click();
 };
 
 async function markAttendance() {
@@ -154,29 +192,65 @@ async function markAttendance() {
         
         // === MARCAR ASISTENCIA ===
         console.log('📍 Esperando botón "Marcar asistencia"...');
-        await page.waitForSelector(SEL.markBtn, { timeout: 10000 });
-        await page.click(SEL.markBtn);
+        const markButton = await page.waitForFunction(
+            () => [...document.querySelectorAll('button')].find(button => {
+                const text = button.textContent.trim().toLowerCase();
+                const style = window.getComputedStyle(button);
+                return text.includes('marcar asistencia') &&
+                    style.visibility !== 'hidden' &&
+                    style.display !== 'none' &&
+                    !button.disabled;
+            }),
+            { timeout: 10000 }
+        );
+        await markButton.evaluate(button => button.click());
         
-        console.log('🔽 Abriendo dropdown...');
-        await page.waitForSelector(SEL.dropdown, { timeout: 8000 });
+        await waitForVisibleText(page, 'Cancelar', false, false, 8000, ATTENDANCE_MODAL);
+
+        console.log('🔽 Abriendo selector de tipo...');
         await randomDelay(500, 1000);
-        await page.click(SEL.dropdown);
+        try {
+            await page.waitForSelector(ATTENDANCE_TYPE_DROPDOWN, { visible: true, timeout: 5000 });
+            await page.click(ATTENDANCE_TYPE_DROPDOWN);
+        } catch (error) {
+            console.log('  ⚠️ Selector del desplegable no encontrado; usando búsqueda por texto...');
+            const typeDropdown = await waitForVisibleText(page, 'Marca', false, false, 5000, ATTENDANCE_MODAL);
+            await clickInteractiveElement(typeDropdown);
+        }
         await randomDelay(1000, 2000);
+        await page.screenshot({ path: 'step-05-dropdown-open.png', fullPage: true });
         
-        const opcionSelector = tipo === 'entrada' ? SEL.entrada : SEL.salida;
-        console.log(`✅ Seleccionando ${tipo === 'entrada' ? 'Entrada' : 'Salida'}...`);
-        await page.waitForSelector(opcionSelector, { timeout: 5000 });
+        const tipoLabel = tipo === 'entrada' ? 'Entrada' : 'Salida';
+        console.log(`✅ Seleccionando ${tipoLabel}...`);
         await randomDelay(300, 800);
-        await page.click(opcionSelector);
+        try {
+            await page.waitForSelector(ATTENDANCE_TYPE_OPTIONS[tipo], { visible: true, timeout: 5000 });
+            await page.click(ATTENDANCE_TYPE_OPTIONS[tipo]);
+        } catch (error) {
+            console.log(`  ⚠️ Selector de ${tipoLabel} no encontrado; usando búsqueda por texto...`);
+            const typeOption = await waitForVisibleText(page, tipoLabel, true, false, 5000, ATTENDANCE_MODAL);
+            await clickInteractiveElement(typeOption);
+        }
+        await page.screenshot({ path: 'step-05-type-selected.png', fullPage: true });
         
         console.log('✅ Confirmando...');
-        await page.waitForSelector(SEL.confirmar, { timeout: 5000 });
-        
-        const isDisabled = await page.$eval(SEL.confirmar, el => el.disabled);
-        if (isDisabled) throw new Error('Botón de confirmar está deshabilitado');
+        let confirmButton;
+        try {
+            confirmButton = await page.waitForFunction(
+                selector => {
+                    const button = document.querySelector(selector);
+                    return button && !button.disabled ? button : false;
+                },
+                { timeout: 8000 },
+                CONFIRM_MARK_BUTTON
+            );
+        } catch (error) {
+            console.log('  ⚠️ Selector del botón Marcar no encontrado; usando búsqueda por texto...');
+            confirmButton = await waitForVisibleText(page, 'Marcar', false, true, 5000, ATTENDANCE_MODAL);
+        }
         
         await randomDelay(500, 1000);
-        await page.click(SEL.confirmar);
+        await confirmButton.evaluate(button => button.click());
         await sleep(2000);
         
         console.log(`✅ ${tipo.toUpperCase()} MARCADA EXITOSAMENTE!`);
